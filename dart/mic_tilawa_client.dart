@@ -227,15 +227,56 @@ class MushafWords {
 
 /// Print each newly matched mushaf word once, in verse order.
 ///
-/// The current verse is redrawn as words arrive.
+/// The current verse is redrawn as words arrive. On a terminal, words the
+/// server heard but has not confirmed yet are shown dimmed after it.
 class WordEcho {
   WordEcho(this._mushaf, {this.visual = true});
 
   final MushafWords _mushaf;
   final bool visual;
+  final _tty = stdioType(stdout) == StdioType.terminal;
   final _seen = <(int, int)>{};
   final _currentVerse = <String>[];
+  var _pending = <String>[];
   int? _lastVerse;
+
+  String _arabic(String logical) => visual ? toVisualArabic(logical) : logical;
+
+  /// Apply one TILAWA_RESULT event.
+  void result(Map event) {
+    _pending = [];
+    echo(event['correct_words'] as List? ?? const []);
+    if (_tty) {
+      _pending = [
+        for (final w in event['pending_words'] as List? ?? const [])
+          if (!_seen.contains((w['verse'] as int, w['word'] as int)))
+            _mushaf.text((w['verse'] as int, w['word'] as int)) ?? '',
+      ]..removeWhere((t) => t.isEmpty);
+      _redraw();
+    }
+    for (final w in event['substituted_words'] as List? ?? const []) {
+      final expected = _mushaf.text((w['verse'] as int, w['word'] as int));
+      note('substituted ${w['verse']}:${w['word']} '
+          '${_arabic(expected ?? '')} -> ${_arabic(w['speach_like'] as String? ?? '')}');
+    }
+  }
+
+  /// Write a status line to stderr without breaking the redrawn verse.
+  void note(String line) {
+    if (_tty) stdout.write('\r\x1b[K');
+    stderr.writeln(line);
+    if (_tty) _redraw();
+  }
+
+  void _redraw() {
+    var line = _arabic(_currentVerse.join(' '));
+    if (_pending.isNotEmpty) {
+      final dim = '\x1b[2m${_arabic(_pending.join(' '))}\x1b[0m';
+      // Visual order puts the later words on the left.
+      line = visual ? '$dim $line' : '$line $dim';
+    }
+    stdout.write('\r\x1b[K${line.trim()}');
+  }
 
   void echo(List<dynamic> correctWords) {
     final fresh = <((int, int), String)>[];
@@ -259,12 +300,15 @@ class WordEcho {
       }
       _currentVerse.add(text);
       _lastVerse = verse;
-      final line = _currentVerse.join(' ');
-      stdout.write('\r\x1b[K${visual ? toVisualArabic(line) : line}');
+      _redraw();
     }
   }
 
   void finish() {
+    if (_pending.isNotEmpty) {
+      _pending = [];
+      _redraw();
+    }
     if (_lastVerse != null) stdout.write('\n');
   }
 }
@@ -484,7 +528,7 @@ Future<int> run(ArgResults args) async {
           case 'TILAWA_SESSION_STARTED':
             _complete(started, event['exit_code'] as int);
           case 'TILAWA_RESULT':
-            echo.echo(event['correct_words'] as List? ?? const []);
+            echo.result(event);
             if (event['exit_code'] == _surahFinished) _complete(finished);
           case 'QRC_ERROR':
             stderr.writeln('error: ${event['message'] ?? 'unknown error'}');
