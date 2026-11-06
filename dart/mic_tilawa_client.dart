@@ -170,6 +170,9 @@ String toVisualArabic(String logical) {
 // ---------------------------------------------------------------------------
 // qurani.ai
 
+/// The session survives a server failure; only that result is lost.
+bool isFatalError(Map event) => event['code'] != 'internal_error';
+
 const _surahApi = 'https://api.qurani.ai/gw/qh/v1/surah';
 const _ayahsPerPage = 50;
 
@@ -245,7 +248,8 @@ class WordEcho {
   /// Apply one TILAWA_RESULT event.
   void result(Map event) {
     _pending = [];
-    echo(event['correct_words'] as List? ?? const []);
+    // /v2 names first; --url can still point at /v1.
+    echo((event['confirmed_words'] ?? event['correct_words']) as List? ?? const []);
     if (_tty) {
       _pending = [
         for (final w in event['pending_words'] as List? ?? const [])
@@ -257,7 +261,7 @@ class WordEcho {
     for (final w in event['substituted_words'] as List? ?? const []) {
       final expected = _mushaf.text((w['verse'] as int, w['word'] as int));
       note('substituted ${w['verse']}:${w['word']} '
-          '${_arabic(expected ?? '')} -> ${_arabic(w['speach_like'] as String? ?? '')}');
+          '${_arabic(expected ?? '')} -> ${_arabic((w['speech_like'] ?? w['speach_like']) as String? ?? '')}');
     }
   }
 
@@ -532,7 +536,7 @@ Future<int> run(ArgResults args) async {
             if (event['exit_code'] == _surahFinished) _complete(finished);
           case 'QRC_ERROR':
             stderr.writeln('error: ${event['message'] ?? 'unknown error'}');
-            _complete(failed);
+            if (isFatalError(event)) _complete(failed);
           case 'TILAWA_SESSION_ENDED':
             _complete(ended);
         }
@@ -657,7 +661,7 @@ ArgResults parseArgs(List<String> argv) {
   final env = Platform.environment;
   final parser = ArgParser()
     ..addOption('url',
-        defaultsTo: env['NABR_WS_URL'] ?? 'wss://api.qurani.ai',
+        defaultsTo: env['NABR_WS_URL'] ?? 'wss://api.qurani.ai/v2',
         help: 'WebSocket endpoint, or set NABR_WS_URL')
     ..addOption('api-key',
         defaultsTo: env['NABR_API_KEY'], help: 'API key, or set NABR_API_KEY')

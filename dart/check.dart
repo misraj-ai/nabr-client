@@ -16,6 +16,8 @@ void _check(bool ok, String what) {
 }
 
 void main() {
+  _check(!isFatalError({'code': 'internal_error'}), 'internal_error continues');
+  _check(isFatalError({'code': 'validation_error'}), 'other errors stop');
   _check(
     pcmS16leToWav([1, 2, 3, 4]).toString() == _hex(_wav).toString(),
     'wav header',

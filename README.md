@@ -19,7 +19,7 @@ You need an API key. Both clients read it from the environment:
 export NABR_API_KEY="your-api-key"
 ```
 
-They connect to `wss://api.qurani.ai` by default. To use another server, such as a local one, pass `--url` or set `NABR_WS_URL`:
+They connect to `wss://api.qurani.ai/v2` by default. To use another server, such as a local one, pass `--url` or set `NABR_WS_URL`:
 
 ```sh
 export NABR_WS_URL="ws://127.0.0.1:8000"
@@ -102,7 +102,7 @@ uv run python/mic_tilawa_client.py --surah 1 --device plughw:1,0
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `--url` | `wss://api.qurani.ai` | Surah-checker WebSocket endpoint. Can be set with `NABR_WS_URL`. |
+| `--url` | `wss://api.qurani.ai/v2` | Surah-checker WebSocket endpoint. Can be set with `NABR_WS_URL`. |
 | `--api-key` | `NABR_API_KEY` | API key. Required. |
 | `--lang` | `ar` | Language for server messages: `ar`, `en`, `es`, `tr`, `id`, or `ur`. |
 | `--surah` | `1` | Surah number, 1 to 114. |

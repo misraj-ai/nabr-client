@@ -221,7 +221,8 @@ class WordEcho:
     def result(self, event: dict) -> None:
         """Apply one TILAWA_RESULT event."""
         self._pending = []
-        self.echo(event.get('correct_words') or [])
+        # /v2 names first; --url can still point at /v1.
+        self.echo(event.get('confirmed_words') or event.get('correct_words') or [])
         if self._tty:
             self._pending = [
                 text
@@ -234,7 +235,7 @@ class WordEcho:
             expected = self._mushaf.text(int(word['verse']), int(word['word'])) or ''
             self.note(
                 f'substituted {word["verse"]}:{word["word"]} '
-                f'{self._arabic(expected)} -> {self._arabic(word.get("speach_like") or "")}'
+                f'{self._arabic(expected)} -> {self._arabic(word.get("speech_like") or word.get("speach_like") or "")}'
             )
 
     def note(self, line: str) -> None:
@@ -246,9 +247,9 @@ class WordEcho:
         if self._tty:
             self._redraw_current_line()
 
-    def echo(self, correct_words: list) -> None:
+    def echo(self, confirmed_words: list) -> None:
         fresh = []
-        for word in correct_words:
+        for word in confirmed_words:
             key = (int(word['verse']), int(word['word']))
             if key in self._seen:
                 continue
@@ -436,7 +437,9 @@ async def _recv_loop(ws, echo: WordEcho, state: dict) -> None:
         elif name == 'QRC_ERROR':
             state['error'] = event.get('message') or 'unknown error'
             print(f'error: {state["error"]}', file=sys.stderr)
-            state['failed'].set()
+            # The session survives a server failure; only that result is lost.
+            if event.get('code') != 'internal_error':
+                state['failed'].set()
         elif name == 'TILAWA_SESSION_ENDED':
             state['ended'].set()
 
@@ -660,8 +663,8 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         '--url',
-        default=os.environ.get('NABR_WS_URL', 'wss://api.qurani.ai'),
-        help='WebSocket endpoint, or set NABR_WS_URL (default: wss://api.qurani.ai)',
+        default=os.environ.get('NABR_WS_URL', 'wss://api.qurani.ai/v2'),
+        help='WebSocket endpoint, or set NABR_WS_URL (default: wss://api.qurani.ai/v2)',
     )
     parser.add_argument(
         '--api-key',
