@@ -42,7 +42,7 @@ export NABR_API_KEY="your-api-key"
 uv run mic_tilawa_client.py --surah 1
 ```
 
-Without the environment variable, pass `--api-key` instead. The client connects to `wss://api.qurani.ai` unless you pass `--url` or set `NABR_WS_URL`.
+Without the environment variable, pass `--api-key` instead. The client connects to `wss://api.qurani.ai/v2` unless you pass `--url` or set `NABR_WS_URL`.
 
 If you run it from inside another uv project (a folder with a `pyproject.toml`), add `--no-project` so uv uses only the script's own dependencies:
 

@@ -28,7 +28,7 @@ export NABR_API_KEY="your-api-key"
 dart run mic_tilawa_client.dart --surah 1
 ```
 
-Without the environment variable, pass `--api-key` instead. The client connects to `wss://api.qurani.ai` unless you pass `--url` or set `NABR_WS_URL`.
+Without the environment variable, pass `--api-key` instead. The client connects to `wss://api.qurani.ai/v2` unless you pass `--url` or set `NABR_WS_URL`.
 
 ## Build a binary
 
