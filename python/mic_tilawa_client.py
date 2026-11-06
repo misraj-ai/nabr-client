@@ -197,18 +197,54 @@ class MushafWords:
 class WordEcho:
     """Print each newly matched mushaf word once, in verse order.
 
-    The current verse is redrawn as words arrive. Terminals that do not shape
-    Arabic get connected glyphs in visual order. Terminals that already do
-    get the original logical text.
+    The current verse is redrawn as words arrive. On a terminal, words the
+    server heard but has not confirmed yet are shown dimmed after it. Terminals
+    that do not shape Arabic get connected glyphs in visual order. Terminals
+    that already do get the original logical text.
     """
 
     def __init__(self, mushaf: MushafWords, out=None, visual: bool = True):
         self._mushaf = mushaf
         self._out = out or sys.stdout
         self._visual = visual
+        self._tty = self._out.isatty()
         self._seen: set[tuple[int, int]] = set()
         self._current_verse: list[str] = []
+        self._pending: list[str] = []
         self._last_verse: Optional[int] = None
+
+    def _arabic(self, logical: str) -> str:
+        if self._visual:
+            return get_display(_arabic_reshaper.reshape(logical))
+        return logical
+
+    def result(self, event: dict) -> None:
+        """Apply one TILAWA_RESULT event."""
+        self._pending = []
+        self.echo(event.get('correct_words') or [])
+        if self._tty:
+            self._pending = [
+                text
+                for w in event.get('pending_words') or []
+                if (int(w['verse']), int(w['word'])) not in self._seen
+                and (text := self._mushaf.text(int(w['verse']), int(w['word'])))
+            ]
+            self._redraw_current_line()
+        for word in event.get('substituted_words') or []:
+            expected = self._mushaf.text(int(word['verse']), int(word['word'])) or ''
+            self.note(
+                f'substituted {word["verse"]}:{word["word"]} '
+                f'{self._arabic(expected)} -> {self._arabic(word.get("speach_like") or "")}'
+            )
+
+    def note(self, line: str) -> None:
+        """Write a status line to stderr without breaking the redrawn verse."""
+        if self._tty:
+            self._out.write('\r\033[K')
+            self._out.flush()
+        print(line, file=sys.stderr)
+        if self._tty:
+            self._redraw_current_line()
 
     def echo(self, correct_words: list) -> None:
         fresh = []
@@ -236,13 +272,18 @@ class WordEcho:
             self._redraw_current_line()
 
     def _redraw_current_line(self) -> None:
-        logical = ' '.join(self._current_verse)
-        if self._visual:
-            logical = get_display(_arabic_reshaper.reshape(logical))
-        self._out.write('\r\033[K' + logical)
+        line = self._arabic(' '.join(self._current_verse))
+        if self._pending:
+            dim = '\033[2m' + self._arabic(' '.join(self._pending)) + '\033[0m'
+            # Visual order puts the later words on the left.
+            line = f'{dim} {line}' if self._visual else f'{line} {dim}'
+        self._out.write('\r\033[K' + line.strip())
         self._out.flush()
 
     def finish(self) -> None:
+        if self._pending:
+            self._pending = []
+            self._redraw_current_line()
         if self._last_verse is not None:
             self._out.write('\n')
             self._out.flush()
@@ -389,7 +430,7 @@ async def _recv_loop(ws, echo: WordEcho, state: dict) -> None:
             state['start_exit'] = int(event['exit_code'])
             state['started'].set()
         elif name == 'TILAWA_RESULT':
-            echo.echo(event.get('correct_words') or [])
+            echo.result(event)
             if int(event.get('exit_code', -1)) == _SURAH_FINISHED:
                 state['finished'].set()
         elif name == 'QRC_ERROR':

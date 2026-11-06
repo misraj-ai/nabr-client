@@ -121,10 +121,10 @@ uv run python/mic_tilawa_client.py --surah 1 --device plughw:1,0
 
 ## Output
 
-- **stdout:** the matched mushaf words. The current ayah is redrawn on one line as words arrive, and each new ayah starts a new line.
-- **stderr:** status lines (`fetching surah…`, `session started…`, `surah finished`) and errors.
+- **stdout:** the confirmed mushaf words. The current ayah is redrawn on one line as words arrive, and each new ayah starts a new line. On a terminal, words the server has heard but not confirmed yet (`pending_words`) are shown dimmed after them, and replaced on every result.
+- **stderr:** status lines (`fetching surah…`, `session started…`, `surah finished`), errors, and one line per substituted word: `substituted 2:5 <expected word> -> <what was heard>`. A substituted word was already printed as confirmed; this line marks it as read wrongly.
 
-So `> words.txt` keeps only the recited text.
+So `> words.txt` keeps only the confirmed text, without the tentative words.
 
 The word text comes from the qurani.ai Hafs word-by-word edition (`https://api.qurani.ai/gw/qh/v1/surah/{n}/ar.wordbyword.hafs`), fetched once at startup. The server sends ayah and word numbers, and the client looks up their text there. The speech-to-text transcript is never printed.
 
